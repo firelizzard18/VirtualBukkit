@@ -19,7 +19,7 @@ public class RealVirtualBukkit extends VirtualBukkit {
 			
 			String line, bits[];
 			while ((line = br.readLine()) != null) {
-				bits = line.split(" ");
+				bits = line.split("\\w");
 				
 				if (bits.length < 1)
 					continue;
@@ -85,6 +85,12 @@ public class RealVirtualBukkit extends VirtualBukkit {
 				e.printStackTrace();
 			}
 		}
+		
+		System.out.println("Listening on " + listeningAddress());
+		if (vhosts.get("") != null)
+			System.out.println("Default host is " + vhosts.get(""));
+		for (Map.Entry<String, InetSocketAddress> entry : vhosts.entrySet())
+			System.out.println("\tVirtual host " + entry.getKey() + " => " + entry.getValue());
 	}
 	
 	public InetSocketAddress listeningAddress() {
