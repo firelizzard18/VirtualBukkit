@@ -19,7 +19,7 @@ public class RealVirtualBukkit extends VirtualBukkit {
 			
 			String line, bits[];
 			while ((line = br.readLine()) != null) {
-				bits = line.split("\\w");
+				bits = line.split("\\s");
 				
 				if (bits.length < 1)
 					continue;

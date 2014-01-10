@@ -40,7 +40,7 @@ public abstract class VirtualBukkit extends Thread {
 			byte[] b = new byte[512];
 			int r = s.getInputStream().read(b);
 			
-			System.out.println(b[0] + " " + b[1] + " "  + b[2] + " "  + b[3]);
+//			System.out.println(b[0] + " " + b[1] + " "  + b[2] + " "  + b[3]);
 			
 			if (r > 0)
 				this.handle(s, b, r);
@@ -51,17 +51,14 @@ public abstract class VirtualBukkit extends Thread {
 	
 	protected void handle(final Socket src, final byte[] init, final int len) {
 		new Thread() {
+			{
+				this.setDaemon(true);
+			}
+			
 			@Override
 			public void run() {
 				try {
-					int slen = 0;
-					while (init[4 + slen] != -35)
-						slen += 1;
-					
-					String host = new String(init, 4, slen - 1);
-					System.out.println(host);
-					
-					InetSocketAddress addr = VirtualBukkit.this.addressForVirtualHost(host);
+					InetSocketAddress addr = VirtualBukkit.this.addressForVirtualHost(new String(init, 4, init[3]));
 					if (addr == null) {
 						src.close();
 						return;
@@ -85,6 +82,10 @@ public abstract class VirtualBukkit extends Thread {
 	
 	protected void handle(final Socket src, final Socket dst) {
 		new Thread() {
+			{
+				this.setDaemon(true);
+			}
+			
 			@Override
 			public void run() {
 				try {
@@ -107,6 +108,10 @@ public abstract class VirtualBukkit extends Thread {
 		}.start();
 		
 		new Thread() {
+			{
+				this.setDaemon(true);
+			}
+			
 			@Override
 			public void run() {
 				try {
