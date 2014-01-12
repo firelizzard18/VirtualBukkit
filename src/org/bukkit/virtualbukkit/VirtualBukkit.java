@@ -58,7 +58,28 @@ public abstract class VirtualBukkit extends Thread {
 			@Override
 			public void run() {
 				try {
-					InetSocketAddress addr = VirtualBukkit.this.addressForVirtualHost(new String(init, 4, init[3]));
+					String host = null;
+					
+					if (init[0] == 2) {
+						// up to 1.6.4
+						int offset = 4 + 2 * (init[2] << 8 | init[3]);
+						int strlen = init[offset++] << 8 | init[offset++];
+						
+						host = new String(init, offset, strlen * 2, "UTF-16");
+					} else if (init[1] == 0) {
+						// recent versions
+						int offset = 3;
+						int strlen = init[offset++];
+						
+						host = new String(init, offset, strlen, "UTF-8");
+					}
+					
+					if (host == null) {
+						src.close();
+						return;
+					}
+					
+					InetSocketAddress addr = VirtualBukkit.this.addressForVirtualHost(host);
 					if (addr == null) {
 						src.close();
 						return;
