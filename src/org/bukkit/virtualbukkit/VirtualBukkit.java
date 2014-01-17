@@ -77,12 +77,20 @@ public abstract class VirtualBukkit extends Thread {
 						
 						host = new String(init, offset, strlen, "UTF-8");
 					} else {
-						System.err.print("Unknown inital packet, closing connection: ");
+						System.err.println("Unknown inital packet, closing connection:");
+						System.out.print('\t');
 						for (int i = 0; i < len; i++)
 							if (20 <= init[i] && init[i] < 127)
 								System.out.print(init[i]);
 							else
 								System.out.print('.');
+						System.out.println();
+						System.out.print('\t');
+						for (int i = 0; i < len; i++) {
+							System.out.print(String.format("%x", init[i]));
+							if (i % 4 == 3)
+								System.out.print(' ');
+						}
 						System.out.println();
 						src.close();
 						return;
@@ -94,6 +102,8 @@ public abstract class VirtualBukkit extends Thread {
 						src.close();
 						return;
 					}
+					
+					System.out.println("Forwarding client to " + addr + " (" + host + ")");
 					
 					Socket dst = new Socket(addr.getAddress(), addr.getPort());
 					
@@ -130,7 +140,7 @@ public abstract class VirtualBukkit extends Thread {
 					while ((r = in.read(b)) > -1)
 						out.write(b, 0, r);
 				} catch (Exception e) {
-					System.out.println("Socket closed");
+					System.err.println("Socket closed: " + e);
 					try {
 						if (!src.isClosed())
 							src.close();
@@ -157,7 +167,7 @@ public abstract class VirtualBukkit extends Thread {
 					while ((r = in.read(b)) > -1)
 						out.write(b, 0, r);
 				} catch (Exception e) {
-					System.out.println("Socket closed");
+					System.err.println("Socket closed: " + e);
 					try {
 						if (!src.isClosed())
 							src.close();
