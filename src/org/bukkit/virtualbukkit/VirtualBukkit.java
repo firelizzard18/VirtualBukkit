@@ -81,7 +81,7 @@ public abstract class VirtualBukkit extends Thread {
 						offset += 2 * strlen;
 						strlen = init[offset++] << 8 | init[offset++];
 						host = new String(init, offset, strlen * 2, "UTF-16");
-					} else if (init[1] == 0) {
+					} else if (len == init[0] && init[1] == 0) {
 						// recent versions
 						int offset = 3;
 						int strlen = init[offset++];
