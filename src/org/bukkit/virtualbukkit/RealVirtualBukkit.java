@@ -1,6 +1,7 @@
 package org.bukkit.virtualbukkit;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -15,7 +16,9 @@ public class RealVirtualBukkit extends VirtualBukkit {
 	{
 		BufferedReader br = null;
 		try {
-			br = new BufferedReader(new InputStreamReader(new FileInputStream("vhosts.properties")));
+			String jarPath = RealVirtualBukkit.class.getProtectionDomain().getCodeSource().getLocation().getPath();
+			File vhostsFile = new File(new File(jarPath).getParentFile(), "vhosts.properties");
+			br = new BufferedReader(new InputStreamReader(new FileInputStream(vhostsFile)));
 			
 			String line, bits[];
 			while ((line = br.readLine()) != null) {
@@ -85,6 +88,9 @@ public class RealVirtualBukkit extends VirtualBukkit {
 				e.printStackTrace();
 			}
 		}
+		
+		if (listeningAddress() == null)
+			System.exit(-1);
 		
 		System.out.println("Listening on " + listeningAddress());
 		if (vhosts.get("") != null)
