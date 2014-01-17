@@ -58,13 +58,17 @@ public abstract class VirtualBukkit extends Thread {
 			@Override
 			public void run() {
 				try {
+//					String user = null;
 					String host = null;
 					
 					if (init[0] == 2) {
 						// up to 1.6.4
-						int offset = 4 + 2 * (init[2] << 8 | init[3]);
+						int offset = 2;
 						int strlen = init[offset++] << 8 | init[offset++];
+//						user = new String(init, offset, strlen * 2, "UTF-16");
 						
+						offset += 2 * strlen;
+						strlen = init[offset++] << 8 | init[offset++];
 						host = new String(init, offset, strlen * 2, "UTF-16");
 					} else if (init[1] == 0) {
 						// recent versions
@@ -72,15 +76,21 @@ public abstract class VirtualBukkit extends Thread {
 						int strlen = init[offset++];
 						
 						host = new String(init, offset, strlen, "UTF-8");
-					}
-					
-					if (host == null) {
+					} else {
+						System.err.print("Unknown inital packet, closing connection: ");
+						for (int i = 0; i < len; i++)
+							if (20 <= init[i] && init[i] < 127)
+								System.out.print(init[i]);
+							else
+								System.out.print('.');
+						System.out.println();
 						src.close();
 						return;
 					}
 					
 					InetSocketAddress addr = VirtualBukkit.this.addressForVirtualHost(host);
 					if (addr == null) {
+						System.err.println("No server for host: " + host);
 						src.close();
 						return;
 					}
@@ -90,11 +100,13 @@ public abstract class VirtualBukkit extends Thread {
 					dst.getOutputStream().write(init, 0, len);
 					handle(src, dst);
 				} catch (Exception e) {
-					e.printStackTrace();
+					System.err.println("Exception ocurred: " + e);
+					
 					try {
-						src.close();
+						if (!src.isClosed())
+							src.close();
 					} catch (IOException ioe) {
-						ioe.printStackTrace();
+						System.err.println("Error closing socket: " + ioe);
 					}
 				}
 			}
@@ -118,11 +130,12 @@ public abstract class VirtualBukkit extends Thread {
 					while ((r = in.read(b)) > -1)
 						out.write(b, 0, r);
 				} catch (Exception e) {
-					e.printStackTrace();
+					System.out.println("Socket closed");
 					try {
-						src.close();
+						if (!src.isClosed())
+							src.close();
 					} catch (IOException ioe) {
-						ioe.printStackTrace();
+						System.err.println("Error closing socket: " + ioe);
 					}
 				}
 			}
@@ -144,11 +157,12 @@ public abstract class VirtualBukkit extends Thread {
 					while ((r = in.read(b)) > -1)
 						out.write(b, 0, r);
 				} catch (Exception e) {
-					e.printStackTrace();
+					System.out.println("Socket closed");
 					try {
-						dst.close();
+						if (!src.isClosed())
+							src.close();
 					} catch (IOException ioe) {
-						ioe.printStackTrace();
+						System.err.println("Error closing socket: " + ioe);
 					}
 				}
 			}

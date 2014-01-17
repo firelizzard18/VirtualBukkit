@@ -79,18 +79,20 @@ public class RealVirtualBukkit extends VirtualBukkit {
 			if (this.laddr == null)
 				this.laddr = new InetSocketAddress("localhost", 25565);
 		} catch (Exception e) {
-			e.printStackTrace();
+			System.err.println("Error reading file: " + e);
 		} finally {
 			try {
 				if (br != null)
 					br.close();
 			} catch (IOException e) {
-				e.printStackTrace();
+				System.err.println("Error closing file: " + e);
 			}
 		}
 		
-		if (listeningAddress() == null)
+		if (listeningAddress() == null) {
+			System.err.println("Could not load config file, exiting");
 			System.exit(-1);
+		}
 		
 		System.out.println("Listening on " + listeningAddress());
 		if (vhosts.get("") != null)
