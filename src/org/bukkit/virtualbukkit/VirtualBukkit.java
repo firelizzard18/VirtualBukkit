@@ -11,6 +11,7 @@ public abstract class VirtualBukkit extends Thread {
 	private volatile boolean running = false;
 	
 	public abstract InetSocketAddress listeningAddress();
+	public abstract InetSocketAddress oldSchoolPingPongAddress();
 	public abstract InetSocketAddress addressForVirtualHost(String hostname);
 	
 	public boolean isRunning() {
@@ -61,7 +62,17 @@ public abstract class VirtualBukkit extends Thread {
 //					String user = null;
 					String host = null;
 					
-					if (init[0] == 2) {
+					if (init[0] == (byte)0xFE) {
+						InetSocketAddress ospp = VirtualBukkit.this.oldSchoolPingPongAddress();
+						if (ospp == null)
+							return;
+						
+						Socket dst = new Socket(ospp.getAddress(), ospp.getPort());
+						
+						dst.getOutputStream().write(init, 0, len);
+						handle(src, dst);
+						return;
+					} else if (init[0] == 2) {
 						// up to 1.6.4
 						int offset = 2;
 						int strlen = init[offset++] << 8 | init[offset++];
@@ -81,13 +92,13 @@ public abstract class VirtualBukkit extends Thread {
 						System.out.print('\t');
 						for (int i = 0; i < len; i++)
 							if (20 <= init[i] && init[i] < 127)
-								System.out.print(init[i]);
+								System.out.print(String.format("%c", init[i]));
 							else
 								System.out.print('.');
 						System.out.println();
 						System.out.print('\t');
 						for (int i = 0; i < len; i++) {
-							System.out.print(String.format("%x", init[i]));
+							System.out.print(String.format("%02x", init[i]));
 							if (i % 4 == 3)
 								System.out.print(' ');
 						}

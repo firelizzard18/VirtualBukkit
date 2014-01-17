@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class RealVirtualBukkit extends VirtualBukkit {
-	private InetSocketAddress laddr = null;
+	private InetSocketAddress laddr = null, ospp = null;
 	private Map<String, InetSocketAddress> vhosts = new ConcurrentHashMap<String, InetSocketAddress>();
 	
 	{
@@ -27,7 +27,7 @@ public class RealVirtualBukkit extends VirtualBukkit {
 				if (bits.length < 1)
 					continue;
 				
-				if ("Listen".equals(bits[0])) {
+				if ("Listen".equalsIgnoreCase(bits[0])) {
 					String host = "0.0.0.0";
 					Integer port = null;
 					
@@ -40,7 +40,9 @@ public class RealVirtualBukkit extends VirtualBukkit {
 						throw new Exception("Listen [host] <port>");
 					
 					this.laddr = new InetSocketAddress(host, port);
-				} else if ("Default".equals(bits[0])) {
+					
+					
+				} else if ("Default".equalsIgnoreCase(bits[0])) {
 					String host = "localhost";
 					Integer port = null;
 					
@@ -57,7 +59,26 @@ public class RealVirtualBukkit extends VirtualBukkit {
 						throw new Exception("Default [host] <port>");
 					
 					vhosts.put("", new InetSocketAddress(host, port));
-				} else  if ("VirtualHost".equals(bits[0])) {
+					
+					
+				} else if ("OldschoolPingPong".equalsIgnoreCase(bits[0])) {
+					String host = "localhost";
+					Integer port = null;
+					
+					if (bits.length == 2) {
+						port = Integer.valueOf(bits[1]);
+						if (port < 0)
+							continue;
+					} else if (bits.length == 3) {
+						host = bits[1];
+						port = Integer.valueOf(bits[2]);
+					} else
+						throw new Exception("OldschoolPingPong [host] <port>");
+					
+					this.ospp = new InetSocketAddress(host, port);
+					
+					
+				} else  if ("VirtualHost".equalsIgnoreCase(bits[0])) {
 					String key = null;
 					String host = "localhost";
 					Integer port = null;
@@ -98,11 +119,16 @@ public class RealVirtualBukkit extends VirtualBukkit {
 		if (vhosts.get("") != null)
 			System.out.println("Default host is " + vhosts.get(""));
 		for (Map.Entry<String, InetSocketAddress> entry : vhosts.entrySet())
-			System.out.println("\tVirtual host " + entry.getKey() + " => " + entry.getValue());
+			if (!entry.getKey().equals(""))
+				System.out.println("Virtual host " + entry.getKey() + " => " + entry.getValue());
 	}
 	
 	public InetSocketAddress listeningAddress() {
 		return this.laddr;
+	}
+	
+	public InetSocketAddress oldSchoolPingPongAddress() {
+		return this.ospp;
 	}
 	
 	public InetSocketAddress addressForVirtualHost(String hostname) {
