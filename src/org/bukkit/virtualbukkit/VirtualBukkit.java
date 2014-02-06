@@ -8,16 +8,18 @@ import java.net.ServerSocket;
 import java.net.Socket;
 
 public abstract class VirtualBukkit extends Thread {
-	private volatile boolean running = false;
+	private volatile boolean running = false; // set true on start, will stop if set false
 	
-	public abstract InetSocketAddress listeningAddress();
-	public abstract InetSocketAddress oldSchoolPingPongAddress();
-	public abstract InetSocketAddress addressForVirtualHost(String hostname);
+	public abstract InetSocketAddress listeningAddress(); // returns listening address
+	public abstract InetSocketAddress oldSchoolPingPongAddress(); // returns pre-1.7 ping address
+	public abstract InetSocketAddress addressForVirtualHost(String hostname); // returns address for host name
 	
+	// returns true if the service is running
 	public boolean isRunning() {
 		return this.running;
 	}
 	
+	// terminates the service
 	public void terminate() {
 		synchronized (this) { this.running = false; }
 	}
@@ -31,26 +33,24 @@ public abstract class VirtualBukkit extends Thread {
 		}
 	}
 	
+	// called by run(), can throw exceptions
 	protected void safeRun() throws Exception {
+		// start running
 		synchronized (this) { this.running = true; }
-
+		
+		// acquire the listening socket
 		ServerSocket ss = new ServerSocket(this.listeningAddress().getPort(), 10, this.listeningAddress().getAddress());
 		
-		while (this.isRunning()) {
-			Socket s = ss.accept();
-			byte[] b = new byte[512];
-			int r = s.getInputStream().read(b);
-			
-//			System.out.println(b[0] + " " + b[1] + " "  + b[2] + " "  + b[3]);
-			
-			if (r > 0)
-				this.handle(s, b, r);
-		}
+		// until the service is terminated...
+		while (this.isRunning())
+			// accept and process connections
+			this.handle(ss.accept());
 		
+		// close the listening socket
 		ss.close();
 	}
 	
-	protected void handle(final Socket src, final byte[] init, final int len) {
+	protected void handle(final Socket src) {
 		new Thread() {
 			{
 				this.setDaemon(true);
@@ -59,36 +59,63 @@ public abstract class VirtualBukkit extends Thread {
 			@Override
 			public void run() {
 				try {
-//					String user = null;
-					String host = null;
+					// read the first packet
+					byte[] init = new byte[512];
+					int len = s.getInputStream().read(init);
 					
-					if (init[0] == (byte)0xFE) {
+					// if no data was read, we're done
+					if (len <= 0)
+						return;
+					
+//					String user = null; // user name
+					String host = null; // host name
+					
+					// gotta figure out what this first packet is
+					
+					// is it a pre-1.7 server ping?
+					if (init[0] == (byte)0xFE)
+					{
+						// get the designated recipient
 						InetSocketAddress ospp = VirtualBukkit.this.oldSchoolPingPongAddress();
 						if (ospp == null)
-							return;
+							return; // give up if there isn't one
 						
+						// open a connection
 						Socket dst = new Socket(ospp.getAddress(), ospp.getPort());
 						
+						// write the first packet, hand off
 						dst.getOutputStream().write(init, 0, len);
 						handle(src, dst);
+						
+						// we're done here
 						return;
-					} else if (init[0] == 2) {
-						// up to 1.6.4
-						int offset = 2;
-						int strlen = init[offset++] << 8 | init[offset++];
+					}
+					// is it a pre-1.7 server connection
+					else if (init[0] == 2)
+					{
+						// user name
+						int offset = 2; // string length offset
+						int strlen = init[offset++] << 8 | init[offset++]; // string length
 //						user = new String(init, offset, strlen * 2, "UTF-16");
 						
-						offset += 2 * strlen;
-						strlen = init[offset++] << 8 | init[offset++];
+						// host name
+						offset += 2 * strlen; // string length offset
+						strlen = init[offset++] << 8 | init[offset++]; // string length
 						host = new String(init, offset, strlen * 2, "UTF-16");
-					} else if (len == init[0] && init[1] == 0) {
-						// recent versions
-						int offset = 3;
-						int strlen = init[offset++];
-						
+					}
+					// is it a 1.7+ connection (ping or otherwise)?
+					else if (len == init[0] && init[1] == 0)
+					{
+						// host name
+						int offset = 3; // string length offset
+						int strlen = init[offset++]; // string length
 						host = new String(init, offset, strlen, "UTF-8");
-					} else {
+					}
+					// no idea what it might be, print it out so someone can submit an issue
+					else {
 						System.err.println("Unknown inital packet, closing connection:");
+						
+						// print out the packet as characters (non-printing chars become '.')
 						System.out.print('\t');
 						for (int i = 0; i < len; i++)
 							if (20 <= init[i] && init[i] < 127)
@@ -96,6 +123,8 @@ public abstract class VirtualBukkit extends Thread {
 							else
 								System.out.print('.');
 						System.out.println();
+						
+						// print out the packet as hex
 						System.out.print('\t');
 						for (int i = 0; i < len; i++) {
 							System.out.print(String.format("%02x", init[i]));
@@ -103,26 +132,33 @@ public abstract class VirtualBukkit extends Thread {
 								System.out.print(' ');
 						}
 						System.out.println();
+						
+						// we're done
 						src.close();
 						return;
 					}
 					
+					// get the address for the host
 					InetSocketAddress addr = VirtualBukkit.this.addressForVirtualHost(host);
 					if (addr == null) {
+						// if there isn't one, we're done
 						System.err.println("No server for host: " + host);
 						src.close();
 						return;
 					}
 					
+					// open a connection to the server
 					System.out.println("Forwarding client to " + addr + " (" + host + ")");
-					
 					Socket dst = new Socket(addr.getAddress(), addr.getPort());
 					
+					// write the first packet, hand off
 					dst.getOutputStream().write(init, 0, len);
 					handle(src, dst);
 				} catch (Exception e) {
+					// something bad happened
 					System.err.println("Exception ocurred: " + e);
 					
+					// close the socket
 					try {
 						if (!src.isClosed())
 							src.close();
@@ -131,9 +167,10 @@ public abstract class VirtualBukkit extends Thread {
 					}
 				}
 			}
-		}.start();
+		}.start(); // start in a new thread
 	}
 	
+	// handle the forwarding
 	protected void handle(final Socket src, final Socket dst) {
 		new Thread() {
 			{
@@ -143,6 +180,7 @@ public abstract class VirtualBukkit extends Thread {
 			@Override
 			public void run() {
 				try {
+					// src => dst
 					InputStream in = src.getInputStream();
 					OutputStream out = dst.getOutputStream();
 					
@@ -170,6 +208,7 @@ public abstract class VirtualBukkit extends Thread {
 			@Override
 			public void run() {
 				try {
+					// dst => src
 					InputStream in = dst.getInputStream();
 					OutputStream out = src.getOutputStream();
 					
