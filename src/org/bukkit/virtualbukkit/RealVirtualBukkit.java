@@ -13,7 +13,7 @@
  * disconnect operations, see VirtualBukkit.java
  *
  */
-package org.bukkit.virtualbukkit;
+ package org.bukkit.virtualbukkit;
  
 import java.io.BufferedReader;
 import java.io.File;
@@ -21,6 +21,9 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -28,9 +31,9 @@ public class RealVirtualBukkit extends VirtualBukkit
 {
 	private InetSocketAddress laddr = null;	//The socket on which this service listens.
 	private InetSocketAddress ospp = null;	//"Old-School Ping Pong", the rudimentary and
-											//	unreliable way in which pre-1.7 clients
+											//	unreliable way in which Pre-1.7-Ping clients
 											//	begin the server handshake.
-											//ALL pre-1.7 clients will be routed here,
+											//ALL Pre-1.7-Ping clients will be routed here,
 											//	regardless of what domain or host they
 											//	entered.
 	
@@ -42,6 +45,17 @@ public class RealVirtualBukkit extends VirtualBukkit
 	
 	private boolean didReadConfig = true;	//Whether the config file was successfully
 											//	loaded.
+	
+	private boolean sql = true;				//Whether SQL features are enabled.
+											//This will be set to false if something goes
+											//	wrong in locating JDBC drivers or connecting
+											//	to the database.
+	
+	Connection connection = null;			//The SQL connection object by which queries are made.
+	private final String db = "bc_web";				//This could eventually be definalized and be made
+													//	a config file option.
+	private final String sqlUser = "webuser";		//
+	private final String sqlPass = "webpassword";	//
 	
 	//The list of domain/host => socket associations.
 	private Map<String, InetSocketAddress> vhosts = new ConcurrentHashMap<String, InetSocketAddress>();
@@ -59,7 +73,7 @@ public class RealVirtualBukkit extends VirtualBukkit
 			while ((line = br.readLine()) != null)
 			//For each line...
 			{
-				//Split the line by spaces.
+				//Split the line by white-spaces, tabs, and spaces.
 				tokens = line.split("\\s");
 				
 				//Ignore blank lines...
@@ -150,16 +164,21 @@ public class RealVirtualBukkit extends VirtualBukkit
 					
 				}
 				//
-				//	PRE-1.7
+				//	PRE-1.7-PING
 				//
-				//Upon finding a line begining with "PRE-1.7",
+				//Upon finding a line begining with "Pre-1.7-Ping",
 				//	begin specification of this service's
-				//	sole pre-1.7 destination port.
+				//	sole Pre-1.7-Ping destination port.
 				//Only one of these can be used. In case
 				//	of multiple valid specifications, the first
 				//	one will be used.
-				//Syntax: "PRE-1.7 [host] <port>"
-				else if (tokens[0].equalsIgnoreCase("PRE-1.7"))
+				//This only applies for server pings coming from
+				//	Pre-1.7 clients. Connections coming from
+				//	Pre-1.7 clients will be routed according to
+				//	the domain/host => socket associations
+				//	specified elsewhere in the config.
+				//Syntax: "Pre-1.7-Ping [host] <port>"
+				else if (tokens[0].equalsIgnoreCase("Pre-1.7-Ping"))
 				{
 					//Set default socket options.
 					String host = "localhost";
@@ -182,7 +201,7 @@ public class RealVirtualBukkit extends VirtualBukkit
 					}
 					else
 					//In case of a wrong number of tokens, throw an error.
-						throw new Exception("[ERROR]       Configuration error on line begining with \"PRE-1.7\"; should be \"PRE-1.7 [host] <port>\".");
+						throw new Exception("[ERROR]       Configuration error on line begining with \"Pre-1.7-Ping\"; should be \"Pre-1.7-Ping [host] <port>\".");
 					
 					//Add the socket to the list of domain/host => socket
 					//	associations.
@@ -287,10 +306,49 @@ public class RealVirtualBukkit extends VirtualBukkit
 		//Report all loaded domain/host => socket associations.
 		for (Map.Entry<String, InetSocketAddress> entry : vhosts.entrySet())
 			if (!entry.getKey().equals(""))
-				System.out.println("[BOOT]        Virtual host " + entry.getKey() + " => " + entry.getValue());
+				System.out.println("[BOOT]        Virtual host associated: " + entry.getKey() + " => " + entry.getValue());
+		
+		//
+		//	DATABASE
+		//
+		try
+		{
+			Class.forName("com.mysql.jdbc.Driver");
+			System.out.println("[SQL]         SQL JDBC driver loaded.");
+			
+			System.out.println("[SQL]         Connecting to database \"localhost:3306/" + db + "\" as user \"" + sqlUser + "\"...");
+			try
+			{
+				connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/" + db,sqlUser,sqlPass);
+				System.out.println("[SQL]         Connection successful.");
+			}
+			catch (SQLException e)
+			{
+				System.out.println("[ERROR]       SQL database connection failed. SQL features will now be disabled.");
+				sql = false;
+			}
+		}
+		catch (ClassNotFoundException e)
+		{
+			System.out.println("[ERROR]       SQL JDBC driver not found. SQL features will now be disabled.");
+			sql = false;
+		}
 		
 		//Notify that loading is complete.
-		System.out.println("\n[BOOT]        ==========\t[BOOT]        Loading complete.\n");
+		System.out.println("\n[BOOT]        ==========\tLoading complete.\n");
+	}
+	
+	//Return whether SQL features are enabled.
+	public boolean isSQLenabled()
+	{
+		return sql;
+	}
+	
+	//Return the SQL connection object by which
+	//	queries are made.
+	public Connection SQLconnection()
+	{
+		return connection;
 	}
 	
 	//Return the listening socket.
@@ -299,7 +357,7 @@ public class RealVirtualBukkit extends VirtualBukkit
 		return this.laddr;
 	}
 	
-	//Return the Pre-1.7 destination socket.
+	//Return the Pre-1.7-Ping destination socket.
 	public InetSocketAddress oldSchoolPingPongAddress()
 	{
 		return this.ospp;
